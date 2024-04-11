@@ -8,13 +8,13 @@ type DidactElement = {
 
 type DidactProps = {
   nodeValue?: DidactText;
-  children?: DidactElement[];
+  children: DidactElement[];
   [key: string]: any;
-} | null;
+};
 
 function createElement(
   type: string,
-  props: DidactProps = { children: [] },
+  props: DidactProps,
   ...children: DidactChild[]
 ): DidactElement {
   return {
@@ -39,8 +39,6 @@ function createTextElement(text: DidactText): DidactElement {
 }
 
 function render(element: DidactElement, container: HTMLElement) {
-  if (element.props === null) return;
-
   if (element.type === "TEXT_ELEMENT") {
     const dom = document.createTextNode(
       typeof element.props.nodeValue === "string" ? element.props.nodeValue : ""
@@ -50,18 +48,16 @@ function render(element: DidactElement, container: HTMLElement) {
   }
 
   const dom = document.createElement(element.type);
-  const isProperty = (key: string) => key !== "children";
+  const isProperty = (key: string) =>
+    key !== "children" && key !== "__self" && key !== "__source";
 
   Object.keys(element.props)
     .filter(isProperty)
     .forEach((name) => {
-      if (element.props === null) return;
       dom.setAttribute(name, element.props[name]);
     });
 
-  if (Array.isArray(element.props.children)) {
-    element.props.children.forEach((child) => render(child, dom));
-  }
+  element.props.children.forEach((child) => render(child, dom));
 
   container.appendChild(dom);
 }
@@ -71,11 +67,12 @@ const Didact = {
   render,
 };
 
-const element = Didact.createElement(
-  "div",
-  { id: "foo" },
-  Didact.createElement("a", null, "bar"),
-  Didact.createElement("b")
+/** @jsx Didact.createElement */
+const element = (
+  <div id="foo">
+    <a>bar</a>
+    <b />
+  </div>
 );
 
 const container = document.getElementById("root");
