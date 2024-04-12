@@ -62,6 +62,24 @@ function render(element: DidactElement, container: HTMLElement) {
   container.appendChild(dom);
 }
 
+let nextUnitOfWork: unknown = null;
+
+function workLoop(deadline: IdleDeadline) {
+  let shouldYield = false;
+  while (nextUnitOfWork && !shouldYield) {
+    nextUnitOfWork = performUnitOfWork(nextUnitOfWork);
+    shouldYield = deadline.timeRemaining() < 1;
+  }
+  requestIdleCallback(workLoop);
+}
+
+requestIdleCallback(workLoop);
+
+function performUnitOfWork(nextUnitOfWork: unknown) {
+  // TODO
+}
+
+// eslint-disable-next-line react-refresh/only-export-components
 const Didact = {
   createElement,
   render,
