@@ -66,17 +66,37 @@ function createDom(fiber: Fiber): HTMLElement | Text {
   return dom;
 }
 
+function commitRoot(): void {
+  commitWork(wipRoot?.child);
+  wipRoot = undefined;
+}
+
+function commitWork(fiber?: Fiber): void {
+  if (!fiber?.dom) {
+    return;
+  }
+  const domParent = fiber.parent?.dom;
+  if (!domParent) {
+    return;
+  }
+  domParent.appendChild(fiber.dom);
+  commitWork(fiber.child);
+  commitWork(fiber.sibling);
+}
+
 function render(element: DidactElement, container: HTMLElement): void {
-  nextUnitOfWork = {
+  wipRoot = {
     type: element.type,
     dom: container,
     props: {
       children: [element],
     },
   };
+  nextUnitOfWork = wipRoot;
 }
 
 let nextUnitOfWork: Fiber | undefined = undefined;
+let wipRoot: Fiber | undefined = undefined;
 
 function workLoop(deadline: IdleDeadline): void {
   let shouldYield = false;
@@ -84,6 +104,11 @@ function workLoop(deadline: IdleDeadline): void {
     nextUnitOfWork = performUnitOfWork(nextUnitOfWork);
     shouldYield = deadline.timeRemaining() < 1;
   }
+
+  if (!nextUnitOfWork && wipRoot) {
+    commitRoot();
+  }
+
   requestIdleCallback(workLoop);
 }
 
@@ -93,10 +118,6 @@ function performUnitOfWork(fiber: Fiber): Fiber | undefined {
   // add dom node
   if (!fiber.dom) {
     fiber.dom = createDom(fiber);
-  }
-
-  if (fiber.parent?.dom) {
-    fiber.parent.dom.appendChild(fiber.dom);
   }
 
   // create new fibers
