@@ -2,7 +2,8 @@ type DidactText = string | number;
 type DidactChild = DidactElement | DidactText;
 
 type DidactElement = {
-  type: string;
+  // eslint-disable-next-line @typescript-eslint/no-explicit-any
+  type: any;
   props: DidactProps;
 };
 
@@ -23,7 +24,8 @@ type Fiber = DidactElement & {
 };
 
 function createElement(
-  type: string,
+  // eslint-disable-next-line @typescript-eslint/no-explicit-any
+  type: any,
   props: DidactProps,
   ...children: DidactChild[]
 ): DidactElement {
@@ -84,13 +86,21 @@ function updateDom(
     return;
   }
 
-  // Remove old properties
+  // Remove old or changed event listeners
   Object.keys(prevProps)
     .filter(isEvent)
     .filter((key) => !(key in nextProps) || isNew(prevProps, nextProps)(key))
     .forEach((name) => {
       const eventType = name.toLowerCase().substring(2);
       dom.removeEventListener(eventType, prevProps[name]);
+    });
+
+  // Remove old properties
+  Object.keys(prevProps)
+    .filter(isProperty)
+    .filter(isGone(nextProps))
+    .forEach((name) => {
+      dom.setAttribute(name, "");
     });
 
   // Set new or changed properties
@@ -119,13 +129,16 @@ function commitRoot(): void {
 }
 
 function commitWork(fiber?: Fiber): void {
-  if (!fiber?.dom) {
+  if (!fiber) {
     return;
   }
-  const domParent = fiber.parent?.dom;
-  if (!domParent) {
-    return;
+
+  let domParentFiber = fiber.parent;
+  while (!domParentFiber?.dom) {
+    domParentFiber = domParentFiber?.parent;
   }
+  const domParent = domParentFiber.dom;
+
   if (fiber.effectTag === "PLACEMENT" && fiber.dom !== undefined) {
     domParent.appendChild(fiber.dom);
   } else if (fiber.effectTag === "UPDATE" && fiber.dom !== undefined) {
@@ -135,10 +148,19 @@ function commitWork(fiber?: Fiber): void {
       fiber.props
     );
   } else if (fiber.effectTag === "DELETION") {
-    domParent.removeChild(fiber.dom);
+    commitDeletion(fiber, domParent);
   }
+
   commitWork(fiber.child);
   commitWork(fiber.sibling);
+}
+
+function commitDeletion(fiber: Fiber, domParent: HTMLElement | Text) {
+  if (fiber.dom) {
+    domParent.removeChild(fiber.dom);
+  } else {
+    fiber.child && commitDeletion(fiber.child, domParent);
+  }
 }
 
 function render(element: DidactElement, container: HTMLElement): void {
@@ -176,14 +198,12 @@ function workLoop(deadline: IdleDeadline): void {
 requestIdleCallback(workLoop);
 
 function performUnitOfWork(fiber: Fiber): Fiber | undefined {
-  // Add dom node
-  if (!fiber.dom) {
-    fiber.dom = createDom(fiber);
+  const isFunctionComponent = fiber.type instanceof Function;
+  if (isFunctionComponent) {
+    updateFunctionComponent(fiber);
+  } else {
+    updateHostCompoment(fiber);
   }
-
-  // Create new fibers
-  const elements = fiber.props.children;
-  reconcileChildren(fiber, elements);
 
   // Return next unit of work
   if (fiber.child) {
@@ -198,12 +218,27 @@ function performUnitOfWork(fiber: Fiber): Fiber | undefined {
   }
 }
 
+function updateFunctionComponent(fiber: Fiber) {
+  const children = [fiber.type(fiber.props)];
+  reconcileChildren(fiber, children);
+}
+
+function updateHostCompoment(fiber: Fiber) {
+  // Add dom node
+  if (!fiber.dom) {
+    fiber.dom = createDom(fiber);
+  }
+
+  // Create new fibers
+  reconcileChildren(fiber, fiber.props.children);
+}
+
 function reconcileChildren(wipFiber: Fiber, elements: DidactElement[]) {
   let index = 0;
   let oldFiber = wipFiber.alternate && wipFiber.alternate.child;
   let prevSibling: Fiber | undefined = undefined;
 
-  while (index < elements.length || oldFiber !== undefined) {
+  while (index < elements.length || oldFiber) {
     const element = elements[index];
     let newFiber: Fiber | undefined = undefined;
 
@@ -259,12 +294,11 @@ const Didact = {
 };
 
 /** @jsx Didact.createElement */
-const element = (
-  <div id="foo">
-    <a>bar</a>
-    <b />
-  </div>
-);
+// eslint-disable-next-line react-refresh/only-export-components
+function App(props: { name: string }) {
+  return <h1>Hi {props.name}</h1>;
+}
+const element = <App name="foo" />;
 
 const container = document.getElementById("root");
 if (!container) throw new Error("No root Element");
