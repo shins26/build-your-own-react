@@ -53,21 +53,6 @@ function createTextElement(text: DidactText): DidactElement {
 }
 
 function createDom(fiber: Fiber): HTMLElement | Text {
-  /*   if (fiber.type === "TEXT_ELEMENT") {
-    return document.createTextNode(
-      typeof fiber.props.nodeValue === "string" ? fiber.props.nodeValue : ""
-    );
-  }
-
-  const dom = document.createElement(fiber.type);
-
-  Object.keys(fiber.props)
-    .filter(isProperty)
-    .forEach((name) => {
-      dom.setAttribute(name, fiber.props[name]);
-    });
- */
-
   const dom =
     fiber.type == "TEXT_ELEMENT"
       ? document.createTextNode("")
