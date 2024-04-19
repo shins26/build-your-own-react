@@ -21,6 +21,8 @@ type Fiber = DidactElement & {
   sibling?: Fiber;
   alternate?: Fiber;
   effectTag?: "UPDATE" | "PLACEMENT" | "DELETION";
+  // eslint-disable-next-line @typescript-eslint/no-explicit-any
+  hooks?: Hook<any>[];
 };
 
 function createElement(
@@ -51,7 +53,7 @@ function createTextElement(text: DidactText): DidactElement {
 }
 
 function createDom(fiber: Fiber): HTMLElement | Text {
-  if (fiber.type === "TEXT_ELEMENT") {
+  /*   if (fiber.type === "TEXT_ELEMENT") {
     return document.createTextNode(
       typeof fiber.props.nodeValue === "string" ? fiber.props.nodeValue : ""
     );
@@ -64,6 +66,14 @@ function createDom(fiber: Fiber): HTMLElement | Text {
     .forEach((name) => {
       dom.setAttribute(name, fiber.props[name]);
     });
+ */
+
+  const dom =
+    fiber.type == "TEXT_ELEMENT"
+      ? document.createTextNode("")
+      : document.createElement(fiber.type);
+
+  updateDom(dom, { children: [] }, fiber.props);
 
   return dom;
 }
@@ -218,9 +228,54 @@ function performUnitOfWork(fiber: Fiber): Fiber | undefined {
   }
 }
 
+let wipFiber: Fiber | undefined = undefined;
+let hookIndex = 0;
+
 function updateFunctionComponent(fiber: Fiber) {
+  wipFiber = fiber;
+  hookIndex = 0;
+  wipFiber.hooks = [];
   const children = [fiber.type(fiber.props)];
   reconcileChildren(fiber, children);
+}
+
+type Hook<T> = {
+  state: T;
+  queue: SetState<T>[];
+};
+
+type SetState<T> = (prevState: T) => T;
+
+function useState<T>(initial: T): [T, (action: SetState<T>) => void] {
+  const oldHook =
+    wipFiber?.alternate &&
+    wipFiber.alternate.hooks &&
+    wipFiber.alternate.hooks[hookIndex];
+  const hook: Hook<T> = {
+    state: oldHook ? oldHook.state : initial,
+    queue: [],
+  };
+
+  const actions = oldHook ? oldHook.queue : [];
+  actions.forEach((action) => {
+    hook.state = action(hook.state);
+  });
+
+  const setState = (action: SetState<T>) => {
+    hook.queue.push(action);
+    wipRoot = {
+      type: "ROOT_ELEMENT",
+      dom: currentRoot?.dom,
+      props: currentRoot ? currentRoot.props : { children: [] },
+      alternate: currentRoot,
+    };
+    nextUnitOfWork = wipRoot;
+    deletions = [];
+  };
+
+  wipFiber?.hooks?.push(hook);
+  hookIndex++;
+  return [hook.state, setState];
 }
 
 function updateHostCompoment(fiber: Fiber) {
@@ -291,14 +346,16 @@ function reconcileChildren(wipFiber: Fiber, elements: DidactElement[]) {
 const Didact = {
   createElement,
   render,
+  useState,
 };
 
 /** @jsx Didact.createElement */
 // eslint-disable-next-line react-refresh/only-export-components
-function App(props: { name: string }) {
-  return <h1>Hi {props.name}</h1>;
+function Counter() {
+  const [state, setState] = Didact.useState(1);
+  return <h1 onClick={() => setState((c: number) => c + 1)}>Count: {state}</h1>;
 }
-const element = <App name="foo" />;
+const element = <Counter />;
 
 const container = document.getElementById("root");
 if (!container) throw new Error("No root Element");
