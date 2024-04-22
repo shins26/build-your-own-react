@@ -8,7 +8,6 @@ type DidactElement = {
 };
 
 type DidactProps = {
-  nodeValue?: DidactText;
   children: DidactElement[];
   // eslint-disable-next-line @typescript-eslint/no-explicit-any
   [key: string]: any;
@@ -76,8 +75,7 @@ function updateDom(
   nextProps: DidactProps
 ) {
   if (dom instanceof Text) {
-    dom.nodeValue =
-      typeof nextProps.nodeValue === "string" ? nextProps.nodeValue : "";
+    dom.nodeValue = nextProps.nodeValue;
     return;
   }
 
@@ -124,9 +122,7 @@ function commitRoot(): void {
 }
 
 function commitWork(fiber?: Fiber): void {
-  if (!fiber) {
-    return;
-  }
+  if (!fiber) return;
 
   let domParentFiber = fiber.parent;
   while (!domParentFiber?.dom) {
@@ -158,7 +154,9 @@ function commitDeletion(fiber: Fiber, domParent: HTMLElement | Text) {
   }
 }
 
-function render(element: DidactElement, container: HTMLElement): void {
+function render(element: DidactElement, container: HTMLElement | null): void {
+  if (!container) return;
+
   wipRoot = {
     type: element.type,
     dom: container,
@@ -338,11 +336,10 @@ const Didact = {
 // eslint-disable-next-line react-refresh/only-export-components
 function Counter() {
   const [state, setState] = Didact.useState(1);
-  return <h1 onClick={() => setState((c: number) => c + 1)}>Count: {state}</h1>;
+  return <h1 onClick={() => setState((c) => c + 1)}>Count: {state}</h1>;
 }
+
 const element = <Counter />;
 
 const container = document.getElementById("root");
-if (!container) throw new Error("No root Element");
-
 Didact.render(element, container);
