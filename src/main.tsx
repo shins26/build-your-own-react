@@ -247,7 +247,7 @@ function useState<T>(initial: T): [T, (action: SetState<T>) => void] {
   const setState = (action: SetState<T>) => {
     hook.queue.push(action);
     wipRoot = {
-      type: "ROOT_ELEMENT",
+      type: currentRoot?.type,
       dom: currentRoot?.dom,
       props: currentRoot ? currentRoot.props : { children: [] },
       alternate: currentRoot,
